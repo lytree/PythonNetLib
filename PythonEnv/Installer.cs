@@ -1,38 +1,11 @@
-/*
 
-Copyright (c) 2020 by Meinrad Recheis (meinrad.recheis@gmail.com)
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
- */
-
-using System;
 using System.Diagnostics;
-using System.IO;
 using System.IO.Compression;
-using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace Python.Deployment
+namespace PythonEnv
 {
     public static partial class Installer
     {
@@ -48,20 +21,12 @@ namespace Python.Deployment
         /// </summary>
         public static string PythonDirectoryName { get; set; } = null;
 
-        public static InstallationSource Source { get; set; } = new DownloadInstallationSource() { DownloadUrl = @"https://www.python.org/ftp/python/3.7.2/python-3.7.2.post1-embed-amd64.zip" };
+        public static InstallationSource Source { get; set; } = new DownloadInstallationSource() { DownloadUrl = @"https://www.python.org/ftp/python/3.10.9/python-3.10.9-embed-amd64.zip" };
 
         /// <summary>
         /// The full path to the Python directory. Customize this by setting InstallPath and InstallDirectory
         /// </summary>
-        public static string EmbeddedPythonHome
-        {
-            get
-            {
-                if (!string.IsNullOrWhiteSpace(PythonDirectoryName))
-                    return Path.Combine(InstallPath, PythonDirectoryName);
-                return Path.Combine(InstallPath, Source.GetPythonDistributionName());
-            }
-        }
+        public static string EmbeddedPythonHome => Path.Combine(InstallPath, (!string.IsNullOrWhiteSpace(PythonDirectoryName) ? PythonDirectoryName : Source.GetPythonDistributionName()) ?? string.Empty);
 
         /// <summary>
         /// Subscribe to this event to get installation log messages 
@@ -110,23 +75,23 @@ namespace Python.Deployment
         /// To be safe, use pip by calling Installer.PipInstallModule.
         /// </summary>
         /// <param name="assembly">The assembly containing the embedded wheel</param>
-        /// <param name="resource_name">Name of the embedded wheel file i.e. "numpy-1.16.3-cp37-cp37m-win_amd64.whl"</param>
+        /// <param name="resourceName">Name of the embedded wheel file i.e. "numpy-1.16.3-cp37-cp37m-win_amd64.whl"</param>
         /// <param name="force"></param>
         /// <returns></returns>
-        public static async Task InstallWheel(Assembly assembly, string resource_name, bool force = false)
+        public static async Task InstallWheel(Assembly assembly, string resourceName, bool force = false)
         {
-            var key = GetResourceKey(assembly, resource_name);
+            var key = GetResourceKey(assembly, resourceName);
             if (string.IsNullOrWhiteSpace(key))
-                throw new ArgumentException($"The resource '{resource_name}' was not found in assembly '{assembly.FullName}'");
+                throw new ArgumentException($"The resource '{resourceName}' was not found in assembly '{assembly.FullName}'");
 
-            var module_name = resource_name.Split('-').FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(module_name))
-                throw new ArgumentException($"The resource name '{resource_name}' did not contain a valid module name");
+            var moduleName = resourceName.Split('-').FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(moduleName))
+                throw new ArgumentException($"The resource name '{resourceName}' did not contain a valid module name");
 
             var lib = GetLibDirectory();
 
-            var module_path = Path.Combine(lib, module_name);
-            if (!force && Directory.Exists(module_path))
+            var modulePath = Path.Combine(lib, moduleName);
+            if (!force && Directory.Exists(modulePath))
                 return;
 
             var wheelPath = Path.Combine(lib, key);
@@ -217,22 +182,22 @@ namespace Python.Deployment
         /// To be safe, use pip by calling Installer.PipInstallModule.
         /// </summary>
         /// <param name="assembly">The assembly containing the embedded wheel</param>
-        /// <param name="resource_name">Name of the embedded wheel file i.e. "numpy-1.16.3-cp37-cp37m-win_amd64.whl"</param>
+        /// <param name="resourceName">Name of the embedded wheel file i.e. "numpy-1.16.3-cp37-cp37m-win_amd64.whl"</param>
         /// <param name="force"></param>
         /// <returns></returns>
-        public static async Task PipInstallWheel(Assembly assembly, string resource_name, bool force = false)
+        public static async Task PipInstallWheel(Assembly assembly, string resourceName, bool force = false)
         {
-            string key = GetResourceKey(assembly, resource_name);
+            string key = GetResourceKey(assembly, resourceName);
             if (string.IsNullOrWhiteSpace(key))
-                throw new ArgumentException($"The resource '{resource_name}' was not found in assembly '{assembly.FullName}'");
-            string module_name = resource_name.Split('-').FirstOrDefault();
-            if (string.IsNullOrWhiteSpace(module_name))
-                throw new ArgumentException($"The resource name '{resource_name}' did not contain a valid module name");
+                throw new ArgumentException($"The resource '{resourceName}' was not found in assembly '{assembly.FullName}'");
+            string? moduleName = resourceName.Split('-').FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(moduleName))
+                throw new ArgumentException($"The resource name '{resourceName}' did not contain a valid module name");
             string libDir = Path.Combine(EmbeddedPythonHome, "Lib");
             if (!Directory.Exists(libDir))
                 Directory.CreateDirectory(libDir);
-            string module_path = Path.Combine(libDir, module_name);
-            if (!force && Directory.Exists(module_path))
+            string modulePath = Path.Combine(libDir, moduleName);
+            if (!force && Directory.Exists(modulePath))
                 return;
 
             string wheelPath = Path.Combine(libDir, key);
@@ -251,7 +216,10 @@ namespace Python.Deployment
                 return;
             var key = GetResourceKey(assembly, resourceName);
             if (key == null)
+            {
                 Log($"Error: Resource name '{resourceName}' not found in assembly {assembly.FullName}!");
+            }
+
             try
             {
                 using Stream stream = assembly.GetManifestResourceStream(key);
@@ -270,26 +238,26 @@ namespace Python.Deployment
             }
         }
 
-        public static string GetResourceKey(Assembly assembly, string embedded_file)
+        public static string? GetResourceKey(Assembly assembly, string embeddedFile)
         {
-            return assembly.GetManifestResourceNames().FirstOrDefault(x => x.Contains(embedded_file));
+            return assembly.GetManifestResourceNames().FirstOrDefault(x => x.Contains(embeddedFile));
         }
 
         /// <summary>
         /// Uses pip to find and install the specified package.
         /// </summary>
-        /// <param name="module_name">The module/package to install </param>
+        /// <param name="moduleName">The module/package to install </param>
         /// <param name="force">When true, reinstall the packages even if it is already up-to-date.</param>
         /// <param name="runInBackground">
         /// Indicates that no command windows will be visible and the process will automatically
         /// terminate when complete. When true, the command window must be manually closed before
         /// processing will continue.
         /// </param>
-        public static async Task PipInstallModule(string module_name, string version = "", bool force = false)
+        public static async Task PipInstallModule(string moduleName, string version = "", bool force = false)
         {
             await TryInstallPip();
 
-            if (IsModuleInstalled(module_name) && !force)
+            if (IsModuleInstalled(moduleName) && !force)
                 return;
 
             string pipPath = Path.Combine(EmbeddedPythonHome, "Scripts", "pip");
@@ -298,7 +266,7 @@ namespace Python.Deployment
             if (version.Length > 0)
                 version = $"=={version}";
 
-            RunCommand($"{pythonPath} -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple {module_name}{version} {forceInstall}");
+            RunCommand($"{pythonPath} -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple {moduleName}{version} {forceInstall}");
         }
 
         /// <summary>
@@ -388,7 +356,7 @@ namespace Python.Deployment
 
         public static async Task RunCommand(string command, CancellationToken token)
         {
-            Process process = new Process();
+            Process process = new();
             try
             {
                 string? args = null;
@@ -454,18 +422,7 @@ namespace Python.Deployment
 
         private static bool AreAllFilesAlreadyPresent(ZipArchive zip, string lib)
         {
-            var allFilesAllReadyPresent = true;
-            foreach (var entry in zip.Entries)
-            {
-                var fn = Path.Combine(lib, entry.FullName);
-                if (!File.Exists(fn))
-                {
-                    allFilesAllReadyPresent = false;
-                    break;
-                }
-            }
-
-            return allFilesAllReadyPresent;
+            return zip.Entries.Select(entry => Path.Combine(lib, entry.FullName)).All(File.Exists);
         }
     }
 }

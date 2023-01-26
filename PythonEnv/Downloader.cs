@@ -1,12 +1,6 @@
-﻿using System;
-using System.IO;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
-
-namespace Python.Deployment
+﻿namespace PythonEnv
 {
-    public static class Downloader
+    internal static class Downloader
     {
         private static readonly HttpClient httpClient = new();
 
@@ -18,7 +12,7 @@ namespace Python.Deployment
         {
             try
             {
-                using FileStream fileStream = new(outputFilePath, FileMode.Create);
+                await using FileStream fileStream = new(outputFilePath, FileMode.Create);
                 await httpClient.DownloadWithProgressAsync(downloadUrl, fileStream, progress, token);
             }
             catch
@@ -32,7 +26,7 @@ namespace Python.Deployment
         }
     }
 
-    public static class HttpClientExtension
+    internal static class HttpClientExtension
     {
         public static async Task DownloadWithProgressAsync(
             this HttpClient client,
@@ -46,8 +40,8 @@ namespace Python.Deployment
 
             var contentLength = response.Content.Headers.ContentLength;
 
-            using var download = await response.Content.ReadAsStreamAsync(cancellationToken);
-            int bufferSize = 81920;
+            await using var download = await response.Content.ReadAsStreamAsync(cancellationToken);
+            const int bufferSize = 81920;
 
             if (progress == null || !contentLength.HasValue)
             {

@@ -22,16 +22,9 @@ SOFTWARE.
 
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
-namespace Python.Deployment
+namespace PythonEnv
 {
     public static partial class Installer
     {
@@ -53,26 +46,30 @@ namespace Python.Deployment
             /// </summary>
             public bool Force { get; set; } = false;
 
-            public virtual string GetPythonDistributionName()
+            public virtual string? GetPythonDistributionName()
             {
                 var zip = GetPythonZipFileName();
-                if (zip == null)
-                    return null;
-                return Path.GetFileNameWithoutExtension(zip);
+                return zip == null ? null : Path.GetFileNameWithoutExtension(zip);
             }
 
             public abstract string? GetPythonZipFileName();
 
-            public virtual string GetPythonVersion()
+            public virtual string? GetPythonVersion()
             {
                 var dist = GetPythonDistributionName();
-                var m=Regex.Match(dist, @"python-(?<major>\d)\.(?<minor>\d+)");
+                if (dist == null)
+                {
+                    Log("Unable to get python distribution name ");
+                    return null;
+                }
+                var m = Regex.Match(dist, @"python-(?<major>\d)\.(?<minor>\d+)");
                 if (!m.Success)
                 {
                     Log("Unable to get python version from distribution name.");
                     return null;
                 }
                 return $"python{m.Groups["major"]}{m.Groups["minor"]}";
+
             }
 
         }
